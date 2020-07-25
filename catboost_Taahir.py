@@ -5,6 +5,8 @@ import os
 from sklearn.model_selection import train_test_split
 from catboost import CatBoostRegressor
 from sklearn.decomposition import PCA
+from sklearn.metrics import mean_squared_error
+from math import sqrt
 
 IN_COLLAB = False
 
@@ -71,6 +73,9 @@ model.fit(
     eval_set=(X_val, y_val),
     verbose=200)
 
+
+rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
+print('test score: ', rms)
 
 submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
 submission.to_csv('submission.csv', index=False)
