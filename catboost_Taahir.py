@@ -41,7 +41,7 @@ def pre_process(df):
     df['Day_in_week'] = StartTime.dt.dayofweek
     df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
-    df['Hour_in_Day']  = StartTime.dt.hour
+    df['Hour_in_Day'] = StartTime.dt.hour
     df = df.drop('Timestamp', axis=1)
     
     return df
@@ -93,7 +93,7 @@ X_test, y_test = split_X_y(test)
 
 model = CatBoostRegressor(
     loss_function='RMSE',
-    iterations=20000,
+    iterations=5000,
     learning_rate=1.0,
     task_type='GPU' if IN_COLLAB else 'CPU'
 )
