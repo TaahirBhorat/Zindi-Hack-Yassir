@@ -97,7 +97,6 @@ X_test, y_test = split_X_y(test)
 model = CatBoostRegressor(
     loss_function='RMSE',
     iterations=5000,
-    learning_rate=1.0,
     task_type='GPU' if IN_COLLAB else 'CPU'
 )
 
