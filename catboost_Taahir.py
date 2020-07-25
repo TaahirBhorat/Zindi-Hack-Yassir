@@ -8,6 +8,7 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 IN_COLLAB = False
+SUBMIT = False
 
 if IN_COLLAB:
     files_directory = '/content/drive/My Drive/Zindi/'
@@ -83,6 +84,8 @@ submission_test_set = add_weather(submission_test_set, weather)
 train = pre_process(train)
 submission_test_set = pre_process(submission_test_set)
 
+full_train = train.copy()
+
 print('splitting into test, validation and training sets')
 test = train.iloc[:8000]
 train = train.iloc[8000:]
@@ -100,15 +103,25 @@ model = CatBoostRegressor(
     task_type='GPU' if IN_COLLAB else 'CPU'
 )
 
-print('training catboost model')
-model.fit(
-    X_train, y_train,
-    eval_set=(X_val, y_val),
-    verbose=200)
+if not SUBMIT:
+    print('training catboost model')
+    model.fit(
+        X_train, y_train,
+        eval_set=(X_val, y_val),
+        verbose=200
+    )
+    
+    rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
+    print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
+    print('\nWARNING: NO SUBMISSION CSV WRITTEN')
 
-
-rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
-print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
-
-submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
-submission.to_csv('submission.csv', index=False)
+else:
+    print('training catboost model on all data')
+    model.fit(
+        full_train.drop(['ID', 'ETA'], axis=1), full_train['ETA'],
+        verbose=200
+    )
+    
+    submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
+    submission.to_csv('submission.csv', index=False)
+    print('\n Submission CSV file written')
