@@ -37,10 +37,11 @@ def pre_process(df):
     
     StartTime = pd.to_datetime(df['Timestamp'], infer_datetime_format=True)
     
-    df['is_peak_traffic'] = [1 if (5<i<9 or 15<i<20) else 0 for i in StartTime.dt.hour]
+    ##df['is_peak_traffic'] = [1 if (5<i<9 or 15<i<20) else 0 for i in StartTime.dt.hour]
     df['Day_in_week'] = StartTime.dt.dayofweek
     df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
+    df['Hour_in_Day'] = StartTime.dt.hour
     df = df.drop('Timestamp', axis=1)
     
     return df
@@ -55,6 +56,18 @@ def add_weather(trips_df, weather_df):
     
     df = pd.merge(trips_df, weather_df, how='left', on='date').drop('date', axis=1)
     return df
+
+def haversine_array(lat1, lng1, lat2, lng2):
+    lat1, lng1, lat2, lng2 = map(np.radians, (lat1, lng1, lat2, lng2))
+    AVG_EARTH_RADIUS = 6371  # in km
+    lat = lat2 - lat1
+    lng = lng2 - lng1
+    d = np.sin(lat * 0.5) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(lng * 0.5) ** 2
+    h = 2 * AVG_EARTH_RADIUS * np.arcsin(np.sqrt(d))
+    return h
+
+train.loc[:, 'distance_haversine'] = haversine_array(train['Origin_lat'].values, train['Origin_lon'].values, train['Destination_lat'].values, train['Destination_lon'].values)
+
 
 
 def clean_training_set(trips_df):
@@ -92,7 +105,7 @@ X_test, y_test = split_X_y(test)
 
 model = CatBoostRegressor(
     loss_function='RMSE',
-    iterations=20000,
+    iterations=5000,
     learning_rate=1.0,
     task_type='GPU' if IN_COLLAB else 'CPU'
 )
