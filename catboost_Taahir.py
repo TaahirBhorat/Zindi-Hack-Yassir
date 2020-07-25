@@ -42,6 +42,8 @@ def pre_process(df):
     df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
     df['Hour_in_Day'] = StartTime.dt.hour
+    df['is_raining'] = np.where(df['total_precipitation']>0, 1, 0)
+    
     df = df.drop('Timestamp', axis=1)
     
     return df
@@ -56,17 +58,6 @@ def add_weather(trips_df, weather_df):
     
     df = pd.merge(trips_df, weather_df, how='left', on='date').drop('date', axis=1)
     return df
-
-def haversine_array(lat1, lng1, lat2, lng2):
-    lat1, lng1, lat2, lng2 = map(np.radians, (lat1, lng1, lat2, lng2))
-    AVG_EARTH_RADIUS = 6371  # in km
-    lat = lat2 - lat1
-    lng = lng2 - lng1
-    d = np.sin(lat * 0.5) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(lng * 0.5) ** 2
-    h = 2 * AVG_EARTH_RADIUS * np.arcsin(np.sqrt(d))
-    return h
-
-train.loc[:, 'distance_haversine'] = haversine_array(train['Origin_lat'].values, train['Origin_lon'].values, train['Destination_lat'].values, train['Destination_lon'].values)
 
 
 
