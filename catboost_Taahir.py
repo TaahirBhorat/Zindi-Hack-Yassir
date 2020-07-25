@@ -20,7 +20,7 @@ def pre_process(df):
     arr = np.vstack((df[['Origin_lat', 'Origin_lon']].values,
                         df[['Destination_lat', 'Destination_lon']].values))
     sample_ind = np.random.permutation(len(arr))
-    kmeans =MiniBatchKMeans(n_clusters=90, batch_size=10000).fit(arr[sample_ind])
+    kmeans =MiniBatchKMeans(n_clusters=150, batch_size=10000).fit(arr[sample_ind])
     
     df.loc[:, 'pickup_cluster'] = kmeans.predict(df[['Origin_lat', 'Origin_lon']])
     df.loc[:, 'dropoff_cluster'] = kmeans.predict(df[['Destination_lat', 'Destination_lon']])
