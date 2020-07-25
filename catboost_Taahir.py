@@ -97,7 +97,7 @@ model.fit(
 
 
 rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
-print('test score: ', rms)
+print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
 
 submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
 submission.to_csv('submission.csv', index=False)
