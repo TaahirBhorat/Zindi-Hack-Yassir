@@ -124,4 +124,4 @@ else:
     
     submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
     submission.to_csv('submission.csv', index=False)
-    print('\n Submission CSV file written')
+    print('\nSubmission CSV file written')
