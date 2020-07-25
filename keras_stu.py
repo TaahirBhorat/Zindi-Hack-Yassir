@@ -2,10 +2,15 @@ import pandas as pd
 from sklearn.cluster import MiniBatchKMeans
 import numpy as np
 import os
-from catboost import CatBoostRegressor
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+
+from sklearn.preprocessing import StandardScaler
+from tensorflow.python.keras import Sequential
+from tensorflow.python.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
 IN_COLLAB = False
 SUBMIT = False
@@ -19,15 +24,15 @@ else:
 def pre_process(df):
     # cluster lat long
     arr = np.vstack((df[['Origin_lat', 'Origin_lon']].values,
-                        df[['Destination_lat', 'Destination_lon']].values))
+                     df[['Destination_lat', 'Destination_lon']].values))
     sample_ind = np.random.permutation(len(arr))
-    kmeans =MiniBatchKMeans(n_clusters=150, batch_size=10000).fit(arr[sample_ind])
+    kmeans = MiniBatchKMeans(n_clusters=90, batch_size=10000).fit(arr[sample_ind])
     
     df.loc[:, 'pickup_cluster'] = kmeans.predict(df[['Origin_lat', 'Origin_lon']])
     df.loc[:, 'dropoff_cluster'] = kmeans.predict(df[['Destination_lat', 'Destination_lon']])
     
     arr = np.vstack((df[['Origin_lat', 'Origin_lon']].values,
-                        df[['Destination_lat', 'Destination_lon']].values))
+                     df[['Destination_lat', 'Destination_lon']].values))
     
     # PCA lat long
     pca = PCA().fit(arr)
@@ -43,8 +48,6 @@ def pre_process(df):
     df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
     df['Hour_in_Day'] = StartTime.dt.hour
-    df['is_raining'] = np.where(df['total_precipitation']>0, 1, 0)
-    
     df = df.drop('Timestamp', axis=1)
     
     return df
@@ -59,7 +62,6 @@ def add_weather(trips_df, weather_df):
     
     df = pd.merge(trips_df, weather_df, how='left', on='date').drop('date', axis=1)
     return df
-
 
 
 def clean_training_set(trips_df):
@@ -97,31 +99,44 @@ X_train, y_train = split_X_y(train)
 X_val, y_val = split_X_y(val)
 X_test, y_test = split_X_y(test)
 
-model = CatBoostRegressor(
-    loss_function='RMSE',
-    iterations=5000,
-    task_type='GPU' if IN_COLLAB else 'CPU'
+x_scaler = StandardScaler().fit(X_train)
+y_scaler = StandardScaler().fit(y_train.to_numpy().reshape(-1, 1))
+
+model = Sequential([
+    Dense(128, activation='relu'),
+    Dense(1, activation='sigmoid'),
+])
+
+opt = Adam(lr=0.00001)
+es = EarlyStopping(monitor='val_loss', verbose=1)
+
+model.compile(
+    optimizer=opt,
+    loss='mse',
+    metrics=['mse'],
 )
 
 if not SUBMIT:
-    print('training catboost model')
+    print('training neural net model')
     model.fit(
-        X_train, y_train,
-        eval_set=(X_val, y_val),
-        verbose=200
+        x_scaler.transform(X_train),  # training data
+        y_scaler.transform(y_train.to_numpy().reshape(-1, 1)),  # training targets
+        validation_data=(x_scaler.transform(X_val), y_scaler.transform(y_val.to_numpy().reshape(-1, 1))),
+        epochs=200,
+        batch_size=512,
+        verbose=2,
+        callbacks=[es]
     )
     
-    rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
+    rms = sqrt(mean_squared_error(y_test, y_scaler.inverse_transform(model.predict(x_scaler.transform(X_test)))))
     print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
     print('\nWARNING: NO SUBMISSION CSV WRITTEN')
-
 else:
-    print('training catboost model on all data')
     model.fit(
-        full_train.drop(['ID', 'ETA'], axis=1), full_train['ETA'],
+        x_scaler.transform(full_train.drop(['ID', 'ETA'], axis=1)), y_scaler.transform(full_train['ETA'].to_numpy().reshape(-1, 1)),
         verbose=200
     )
-    
-    submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
+    submission = pd.DataFrame({'ID': submission_test_set['ID'],
+                               'ETA': y_scaler.inverse_transform(model.predict(x_scaler.transform(submission_test_set.drop('ID', axis=1))))})
     submission.to_csv('submission.csv', index=False)
     print('\nSubmission CSV file written')

@@ -2,10 +2,10 @@ import pandas as pd
 from sklearn.cluster import MiniBatchKMeans
 import numpy as np
 import os
-from catboost import CatBoostRegressor
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+import xgboost as xgb
 
 IN_COLLAB = False
 SUBMIT = False
@@ -97,17 +97,20 @@ X_train, y_train = split_X_y(train)
 X_val, y_val = split_X_y(val)
 X_test, y_test = split_X_y(test)
 
-model = CatBoostRegressor(
-    loss_function='RMSE',
-    iterations=5000,
-    task_type='GPU' if IN_COLLAB else 'CPU'
+print('training xgb model')
+
+model = xgb.XGBRegressor(
+    n_estimators=5000,
+    objective='reg:squarederror',
+    tree_method='gpu_hist'if IN_COLLAB else 'hist',
+    gpu_id=0
 )
 
 if not SUBMIT:
-    print('training catboost model')
+    print('training xgboost model')
     model.fit(
         X_train, y_train,
-        eval_set=(X_val, y_val),
+        eval_set=[(X_val, y_val)],
         verbose=200
     )
     
@@ -116,7 +119,7 @@ if not SUBMIT:
     print('\nWARNING: NO SUBMISSION CSV WRITTEN')
 
 else:
-    print('training catboost model on all data')
+    print('training xgboost model on all data')
     model.fit(
         full_train.drop(['ID', 'ETA'], axis=1), full_train['ETA'],
         verbose=200
