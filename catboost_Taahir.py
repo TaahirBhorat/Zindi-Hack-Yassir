@@ -2,7 +2,6 @@ import pandas as pd
 from sklearn.cluster import MiniBatchKMeans
 import numpy as np
 import os
-from sklearn.model_selection import train_test_split
 from catboost import CatBoostRegressor
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
@@ -63,11 +62,16 @@ def clean_training_set(trips_df):
     return trips_df[(trips_df['Trip_distance'] / 1000) / (trips_df['ETA'] / (60 * 60)) <= 200]
 
 
+def split_X_y(df):
+    return df.drop(['ETA', 'ID'], axis=1), df['ETA']
+
+
 train = pd.read_csv(os.path.join(files_directory, 'Train.csv'))
 submission_test_set = pd.read_csv(os.path.join(files_directory, 'Test.csv'))
 weather = pd.read_csv(os.path.join(files_directory, 'Weather.csv'))
 
 train = add_weather(train, weather)
+train = train.sort_values('Timestamp', ascending=False)
 train = clean_training_set(train)
 
 submission_test_set = add_weather(submission_test_set, weather)
@@ -75,12 +79,16 @@ submission_test_set = add_weather(submission_test_set, weather)
 train = pre_process(train)
 submission_test_set = pre_process(submission_test_set)
 
-X = train.drop(['ETA', 'ID'], axis=1)
-y = train['ETA']
-
 print('splitting into test, validation and training sets')
-X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=True, test_size=0.01)
-X_val, X_test, y_val, y_test = train_test_split(X, y, shuffle=True, test_size=0.5)
+test = train.iloc[:8000]
+train = train.iloc[8000:]
+
+val = train.iloc[:8000]
+train = train.iloc[8000:]
+
+X_train, y_train = split_X_y(train)
+X_val, y_val = split_X_y(val)
+X_test, y_test = split_X_y(test)
 
 model = CatBoostRegressor(
     loss_function='RMSE',
