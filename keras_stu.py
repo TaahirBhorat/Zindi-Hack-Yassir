@@ -2,14 +2,18 @@ import pandas as pd
 from sklearn.cluster import MiniBatchKMeans
 import numpy as np
 import os
-from catboost import CatBoostRegressor
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 from sklearn.preprocessing import StandardScaler
+from tensorflow.python.keras import Sequential
+from tensorflow.python.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
 IN_COLLAB = False
+SUBMIT = False
 
 if IN_COLLAB:
     files_directory = '/content/drive/My Drive/Zindi/'
@@ -20,15 +24,15 @@ else:
 def pre_process(df):
     # cluster lat long
     arr = np.vstack((df[['Origin_lat', 'Origin_lon']].values,
-                        df[['Destination_lat', 'Destination_lon']].values))
+                     df[['Destination_lat', 'Destination_lon']].values))
     sample_ind = np.random.permutation(len(arr))
-    kmeans =MiniBatchKMeans(n_clusters=90, batch_size=10000).fit(arr[sample_ind])
+    kmeans = MiniBatchKMeans(n_clusters=90, batch_size=10000).fit(arr[sample_ind])
     
     df.loc[:, 'pickup_cluster'] = kmeans.predict(df[['Origin_lat', 'Origin_lon']])
     df.loc[:, 'dropoff_cluster'] = kmeans.predict(df[['Destination_lat', 'Destination_lon']])
     
     arr = np.vstack((df[['Origin_lat', 'Origin_lon']].values,
-                        df[['Destination_lat', 'Destination_lon']].values))
+                     df[['Destination_lat', 'Destination_lon']].values))
     
     # PCA lat long
     pca = PCA().fit(arr)
@@ -82,6 +86,8 @@ submission_test_set = add_weather(submission_test_set, weather)
 train = pre_process(train)
 submission_test_set = pre_process(submission_test_set)
 
+full_train = train.copy()
+
 print('splitting into test, validation and training sets')
 test = train.iloc[:8000]
 train = train.iloc[8000:]
@@ -96,22 +102,41 @@ X_test, y_test = split_X_y(test)
 x_scaler = StandardScaler().fit(X_train)
 y_scaler = StandardScaler().fit(y_train.to_numpy().reshape(-1, 1))
 
-model = CatBoostRegressor(
-    loss_function='RMSE',
-    iterations=5000,
-    learning_rate=1.0,
-    task_type='GPU' if IN_COLLAB else 'CPU'
+model = Sequential([
+    Dense(128, activation='relu'),
+    Dense(1, activation='sigmoid'),
+])
+
+opt = Adam(lr=0.00001)
+es = EarlyStopping(monitor='val_loss', verbose=1)
+
+model.compile(
+    optimizer=opt,
+    loss='mse',
+    metrics=['mse'],
 )
 
-print('training catboost model')
-model.fit(
-    x_scaler.transform(X_train), y_scaler.transform(y_train.to_numpy().reshape(-1, 1)),
-    eval_set=(x_scaler.transform(X_val), y_scaler.transform(y_val.to_numpy().reshape(-1, 1))),
-    verbose=200)
-
-
-rms = sqrt(mean_squared_error(y_test, y_scaler.inverse_transform(model.predict(x_scaler.transform(X_test)))))
-print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
-
-submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': y_scaler.inverse_transform(model.predict(x_scaler.transform(submission_test_set.drop('ID', axis=1))))})
-submission.to_csv('submission.csv', index=False)
+if not SUBMIT:
+    print('training neural net model')
+    model.fit(
+        x_scaler.transform(X_train),  # training data
+        y_scaler.transform(y_train.to_numpy().reshape(-1, 1)),  # training targets
+        validation_data=(x_scaler.transform(X_val), y_scaler.transform(y_val.to_numpy().reshape(-1, 1))),
+        epochs=200,
+        batch_size=512,
+        verbose=2,
+        callbacks=[es]
+    )
+    
+    rms = sqrt(mean_squared_error(y_test, y_scaler.inverse_transform(model.predict(x_scaler.transform(X_test)))))
+    print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
+    print('\nWARNING: NO SUBMISSION CSV WRITTEN')
+else:
+    model.fit(
+        x_scaler.transform(full_train.drop(['ID', 'ETA'], axis=1)), y_scaler.transform(full_train['ETA'].to_numpy().reshape(-1, 1)),
+        verbose=200
+    )
+    submission = pd.DataFrame({'ID': submission_test_set['ID'],
+                               'ETA': y_scaler.inverse_transform(model.predict(x_scaler.transform(submission_test_set.drop('ID', axis=1))))})
+    submission.to_csv('submission.csv', index=False)
+    print('\nSubmission CSV file written')
