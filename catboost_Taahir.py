@@ -47,8 +47,30 @@ def pre_process(df):
     return df
 
 
+def add_weather(trips_df, weather_df):
+    trips_df['Timestamp'] = pd.to_datetime(trips_df['Timestamp'], infer_datetime_format=True)
+    weather_df['date'] = pd.to_datetime(weather_df['date'], infer_datetime_format=True)
+    
+    trips_df['date'] = trips_df['Timestamp'].dt.date
+    weather_df['date'] = weather_df['date'].dt.date
+    
+    df = pd.merge(trips_df, weather_df, how='left', on='date').drop('date', axis=1)
+    return df
+
+
+def clean_training_set(trips_df):
+    # remove trips with average speed over 200
+    return trips_df[(trips_df['Trip_distance'] / 1000) / (trips_df['ETA'] / (60 * 60)) <= 200]
+
+
 train = pd.read_csv(os.path.join(files_directory, 'Train.csv'))
 submission_test_set = pd.read_csv(os.path.join(files_directory, 'Test.csv'))
+weather = pd.read_csv(os.path.join(files_directory, 'Weather.csv'))
+
+train = add_weather(train, weather)
+train = clean_training_set(train)
+
+submission_test_set = add_weather(submission_test_set, weather)
 
 train = pre_process(train)
 submission_test_set = pre_process(submission_test_set)
