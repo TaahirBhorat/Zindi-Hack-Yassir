@@ -108,8 +108,8 @@ params['num_leaves'] = 10
 params['min_data'] = 50
 params['max_depth'] = 10
 
-if IN_COLLAB:
-    params['device'] = 'gpu'
+# if IN_COLLAB:
+#     params['device'] = 'gpu'
 
 if not SUBMIT:
     print('training lgb model')
