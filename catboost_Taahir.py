@@ -37,10 +37,11 @@ def pre_process(df):
     
     StartTime = pd.to_datetime(df['Timestamp'], infer_datetime_format=True)
     
-    df['is_peak_traffic'] = [1 if (5<i<9 or 15<i<20) else 0 for i in StartTime.dt.hour]
+    ##df['is_peak_traffic'] = [1 if (5<i<9 or 15<i<20) else 0 for i in StartTime.dt.hour]
     df['Day_in_week'] = StartTime.dt.dayofweek
     df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
+    df['Hour_in_Day']  = StartTime.dt.hour
     df = df.drop('Timestamp', axis=1)
     
     return df
