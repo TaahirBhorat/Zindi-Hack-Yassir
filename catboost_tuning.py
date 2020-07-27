@@ -40,7 +40,7 @@ def pre_process(df):
     
     ##df['is_peak_traffic'] = [1 if (5<i<9 or 15<i<20) else 0 for i in StartTime.dt.hour]
     df['Day_in_week'] = StartTime.dt.dayofweek
-    df['Day_in_year'] = StartTime.dt.dayofyear
+    # df['Day_in_year'] = StartTime.dt.dayofyear
     df['Month'] = StartTime.dt.month
     df['Hour_in_Day'] = StartTime.dt.hour
     # df['is_raining'] = np.where(df['total_precipitation']>0, 1, 0)
@@ -114,7 +114,10 @@ if not SUBMIT:
     
     rms = sqrt(mean_squared_error(y_test, model.predict(X_test)))
     print('test score: ', rms, 'over', X_test.shape[0], 'test samples')
-    print('\nWARNING: NO SUBMISSION CSV WRITTEN')
+
+    submission = pd.DataFrame({'ID': submission_test_set['ID'], 'ETA': model.predict(submission_test_set.drop('ID', axis=1))})
+    submission.to_csv('submission.csv', index=False)
+    print('\nSubmission CSV file written')
 
 else:
     print('training catboost model on all data')
